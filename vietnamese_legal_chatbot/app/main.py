@@ -17,6 +17,24 @@ import uvicorn
 import json
 import logging
 from pathlib import Path
+import asyncio
+import traceback
+
+# Import RAG system and services
+try:
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    
+    from models.legal_rag import VietnameseLegalRAG
+    from services.pinecone_service import PineconeService
+    from services.serp_service import SerpAPIService
+    from utils.text_processing import VietnameseTextProcessor
+    RAG_AVAILABLE = True
+except ImportError as e:
+    RAG_AVAILABLE = False
+    logging.warning(f"RAG system not available: {e}")
+    print(f"Warning: RAG system import failed: {e}")
 
 # Pydantic Models for API
 class LegalQuery(BaseModel):
@@ -81,6 +99,93 @@ security = HTTPBearer(auto_error=False)
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Debug middleware to log requests
+@app.middleware("http")
+async def log_requests(request, call_next):
+    if request.url.path == "/api/legal-query" and request.method == "POST":
+        body = await request.body()
+        logger.info(f"Raw request body: {body.decode('utf-8')}")
+        
+        # Recreate request with the body
+        async def receive():
+            return {"type": "http.request", "body": body}
+        
+        request._receive = receive
+    
+    response = await call_next(request)
+    return response
+
+# Initialize RAG system globally
+rag_system = None
+pinecone_service = None
+serp_service = None
+
+async def initialize_rag_system():
+    """Initialize RAG system on startup"""
+    global rag_system, pinecone_service, serp_service
+    try:
+        if RAG_AVAILABLE:
+            logger.info("Initializing Vietnamese Legal RAG system...")
+            
+            # Get config - use demo config for development
+            try:
+                from utils.demo_config import get_demo_config
+                config = get_demo_config()
+                logger.info("Using demo config for development")
+            except Exception as e:
+                logger.warning(f"Demo config not available, using mock mode: {e}")
+                config = None
+                
+            if config and hasattr(config, 'pinecone_api_key'):
+                # Initialize Pinecone service
+                pinecone_service = PineconeService(
+                    api_key=config.pinecone_api_key,
+                    environment=config.pinecone_environment,
+                    index_name=config.pinecone_index_name,
+                    openai_api_key=config.openai_embedding_api_key
+                )
+                
+                # Initialize SerpAPI service
+                serp_service = SerpAPIService(
+                    api_key=config.serp_api_key
+                )
+                logger.info(f"SerpAPI service initialized: {serp_service.is_service_available()}")
+                
+                # Import and initialize chat model
+                from models.chat_model import OpenAIChatModel
+                chat_model = OpenAIChatModel(
+                    api_key=config.openai_chat_api_key,
+                    api_base=config.openai_chat_api_base,
+                    model=config.chat_model
+                )
+                
+                rag_system = VietnameseLegalRAG(
+                    pinecone_service=pinecone_service,
+                    chat_model=chat_model,
+                    embedding_api_key=config.openai_embedding_api_key,
+                    embedding_api_base=config.openai_embedding_api_base,
+                    serp_service=serp_service
+                )
+                logger.info("RAG system initialized with real Pinecone connection")
+            else:
+                logger.warning("Pinecone config not available - using mock RAG system")
+                rag_system = None
+                pinecone_service = None
+                serp_service = None
+        else:
+            logger.warning("RAG system not available - using mock responses")
+    except Exception as e:
+        logger.error(f"Failed to initialize RAG system: {e}")
+        logger.error(traceback.format_exc())
+        rag_system = None
+        pinecone_service = None
+        serp_service = None
+
+@app.on_event("startup")
+async def startup_event():
+    """App startup event"""
+    await initialize_rag_system()
 
 # Vietnamese Legal Domains Configuration
 VIETNAMESE_LEGAL_DOMAINS = {
@@ -177,10 +282,12 @@ async def process_legal_query(query: LegalQuery):
     Xử lý truy vấn pháp lý và trả về phản hồi AI
     """
     try:
+        logger.info(f"Received query data: question='{query.question[:50]}...', domain='{query.domain}', region='{query.region}'")
         logger.info(f"Processing legal query: {query.question[:50]}...")
         
         # Validate domain
         if query.domain not in VIETNAMESE_LEGAL_DOMAINS:
+            logger.error(f"Invalid domain '{query.domain}'. Supported: {list(VIETNAMESE_LEGAL_DOMAINS.keys())}")
             raise HTTPException(
                 status_code=400, 
                 detail=f"Invalid legal domain. Supported: {list(VIETNAMESE_LEGAL_DOMAINS.keys())}"
@@ -188,6 +295,7 @@ async def process_legal_query(query: LegalQuery):
         
         # Validate region
         if query.region not in VIETNAMESE_REGIONS:
+            logger.error(f"Invalid region '{query.region}'. Supported: {list(VIETNAMESE_REGIONS.keys())}")
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid region. Supported: {list(VIETNAMESE_REGIONS.keys())}"
@@ -200,6 +308,12 @@ async def process_legal_query(query: LegalQuery):
         
         # Generate AI response (placeholder for actual RAG implementation)
         ai_response = await generate_legal_response(query)
+        
+        # Debug: Log response structure
+        logger.info(f"Generated response structure: {type(ai_response)}")
+        logger.info(f"Response content length: {len(ai_response.content) if hasattr(ai_response, 'content') else 'No content'}")
+        logger.info(f"Response confidence: {ai_response.confidence if hasattr(ai_response, 'confidence') else 'No confidence'}")
+        logger.info(f"Response citations count: {len(ai_response.citations) if hasattr(ai_response, 'citations') else 'No citations'}")
         
         logger.info(f"Successfully processed query for domain: {query.domain}")
         return ai_response
@@ -303,47 +417,122 @@ def auto_detect_legal_domain(question: str) -> Optional[str]:
     return None
 
 async def generate_legal_response(query: LegalQuery) -> LegalResponse:
-    """Generate AI legal response (placeholder for actual RAG implementation)"""
+    """Generate AI legal response using RAG system"""
+    global rag_system, pinecone_service
     
+    try:
+        # Try using RAG system first
+        if rag_system is not None and RAG_AVAILABLE:
+            logger.info("Using RAG system for legal query processing")
+            
+            # Process query through RAG
+            rag_result = rag_system.query(
+                question=query.question,
+                legal_domain=query.domain,
+                max_results=5,
+                confidence_threshold=0.7
+            )
+            
+            return LegalResponse(
+                content=rag_result.answer,
+                citations=[{
+                    "title": str(citation),
+                    "article": citation.article or "N/A",
+                    "content": citation.document_name,
+                    "authority": "RAG System",
+                    "source": citation.document_type
+                } for citation in rag_result.citations],
+                confidence=rag_result.confidence_score,
+                domain=rag_result.legal_domain,
+                warnings=rag_result.warnings or []
+            )
+            
+        # Fallback to Pinecone direct search
+        elif pinecone_service is not None:
+            logger.info("Using direct Pinecone search for legal query")
+            
+            # Search for relevant documents
+            search_results = await pinecone_service.search_similar_documents(
+                query_text=query.question,
+                legal_domain=query.domain,
+                top_k=3
+            )
+            
+            if search_results:
+                # Combine search results into response
+                combined_content = "🔍 **Kết quả tìm kiếm từ cơ sở dữ liệu pháp lý:**\n\n"
+                citations = []
+                
+                for i, result in enumerate(search_results, 1):
+                    combined_content += f"**{i}. {result.metadata.get('title', 'Tài liệu pháp lý')}**\n"
+                    combined_content += f"{result.content[:500]}...\n\n"
+                    
+                    citations.append({
+                        "title": result.metadata.get('title', 'Không rõ'),
+                        "article": result.metadata.get('article_number', 'N/A'),
+                        "content": result.content[:200],
+                        "score": result.score,
+                        "legal_domain": result.metadata.get('legal_domain', query.domain)
+                    })
+                
+                combined_content += "\n⚠️ **Lưu ý:** Thông tin trên được truy xuất từ cơ sở dữ liệu pháp lý. Vui lòng tham khảo ý kiến chuyên gia pháp lý."
+                
+                return LegalResponse(
+                    content=combined_content,
+                    citations=citations,
+                    confidence=max(r.score for r in search_results),
+                    domain=query.domain,
+                    warnings=["Kết quả từ tìm kiếm trực tiếp - chưa qua xử lý AI đầy đủ"]
+                )
+        
+        # Final fallback - enhanced mock response
+        logger.warning("Using enhanced mock response - no RAG/Pinecone available")
+        
+    except Exception as e:
+        logger.error(f"Error in RAG processing: {e}")
+        logger.error(traceback.format_exc())
+    
+    # Enhanced fallback response
     domain_info = VIETNAMESE_LEGAL_DOMAINS[query.domain]
     region_info = VIETNAMESE_REGIONS[query.region]
     
-    # Mock response - replace with actual AI/RAG implementation
     mock_content = f"""
-🔍 **Phân tích câu hỏi pháp lý**
+🔍 **Phân tích câu hỏi pháp lý** (Chế độ demo - cần kết nối cơ sở dữ liệu)
 
-Dựa trên câu hỏi: "{query.question}"
+**Câu hỏi:** "{query.question}"
 
 📋 **Lĩnh vực pháp lý:** {domain_info['name']}
-🌏 **Vùng miền:** {region_info['name']}
+🌏 **Vùng miền áp dụng:** {region_info['name']}
 
 ⚖️ **Cơ sở pháp lý chính:**
 - {domain_info['primary_law']}
-- Các văn bản hướng dẫn liên quan
+- Các văn bản hướng dẫn thi hành
 
 📖 **Hướng dẫn cụ thể:**
 1. Tham khảo {domain_info['primary_law']}
-2. Tuân thủ quy định của {region_info['name']}
-3. Đặc thù về: {', '.join(region_info['specialties'])}
+2. Xem xét đặc thù của {region_info['name']}: {', '.join(region_info['specialties'])}
+3. Tuân thủ các quy định về: {', '.join(domain_info['keywords'])}
 
 ⚠️ **Lưu ý quan trọng:**
+- ⚠️ **HỆ THỐNG ĐANG TRONG CHẾ ĐỘ DEMO**
+- Cần kết nối với cơ sở dữ liệu Pinecone để có kết quả chính xác
 - Thông tin này chỉ mang tính chất tham khảo
-- Khuyến nghị tham khảo ý kiến luật sư cho các vấn đề phức tạp
-- Kiểm tra văn bản pháp luật mới nhất
+- Khuyến nghị tham khảo ý kiến luật sư chuyên nghiệp
 
-🏛️ **Liên hệ hỗ trợ:**
+🏛️ **Liên hệ hỗ trợ chính thức:**
 - Tổng đài tư vấn pháp luật: 1900-96-96
-- Website: https://moj.gov.vn
+- Cổng thông tin điện tử Bộ Tư pháp: https://moj.gov.vn
+- Hệ thống tra cứu văn bản: https://thuvienphapluat.vn
 """
     
     mock_citations = [
         {
             "title": domain_info['primary_law'],
-            "article": "Điều 15",
-            "clause": "Khoản 1", 
-            "content": "Quy định về quyền và nghĩa vụ cơ bản...",
-            "authority": "Quốc hội",
-            "date": "2015-06-19",
+            "article": "Cần tra cứu cụ thể",
+            "clause": "Theo nội dung câu hỏi", 
+            "content": "Nội dung chi tiết cần truy xuất từ cơ sở dữ liệu...",
+            "authority": "Quốc hội/Chính phủ",
+            "status": "Demo - cần kết nối DB",
             "url": "https://thuvienphapluat.vn"
         }
     ]
@@ -351,11 +540,12 @@ Dựa trên câu hỏi: "{query.question}"
     return LegalResponse(
         content=mock_content,
         citations=mock_citations,
-        confidence=0.85,
+        confidence=0.3,  # Low confidence for demo
         domain=query.domain,
         warnings=[
+            "HỆ THỐNG DEMO - Cần kết nối cơ sở dữ liệu Pinecone",
             "Thông tin chỉ mang tính tham khảo",
-            "Cần xác minh với văn bản pháp luật mới nhất"
+            "Cần xác minh với văn bản pháp luật chính thức"
         ]
     )
 

@@ -21,12 +21,15 @@ class Settings(BaseSettings):
     openai_api_base: str = Field(default="https://api.openai.com/v1", env="OPENAI_API_BASE")
     openai_organization_id: Optional[str] = Field(default=None, env="OPENAI_ORGANIZATION_ID")
     
-    # Separate Embedding API Configuration
-    embedding_api_key: str = Field(..., env="EMBEDDING_API_KEY")
-    embedding_api_base: str = Field(default="https://api.openai.com/v1", env="EMBEDDING_API_BASE")
+    # Separate Embedding API Configuration  
+    openai_embedding_api_key: str = Field(..., env="OPENAI_EMBEDDING_API_KEY")
+    openai_embedding_api_base: str = Field(default="https://api.openai.com/v1", env="OPENAI_EMBEDDING_API_BASE")
     embedding_organization_id: Optional[str] = Field(default=None, env="EMBEDDING_ORGANIZATION_ID")
     
     pinecone_api_key: str = Field(..., env="PINECONE_API_KEY")
+    
+    # Security
+    secret_key: str = Field(..., env="SECRET_KEY")
     
     # Pinecone Configuration
     pinecone_environment: str = Field(default="us-east-1-aws", env="PINECONE_ENVIRONMENT")
@@ -45,7 +48,7 @@ class Settings(BaseSettings):
     streamlit_port: int = Field(default=8501, env="STREAMLIT_PORT")
     
     # AI Configuration
-    embedding_model: str = Field(default="text-embedding-ada-002", env="EMBEDDING_MODEL")
+    embedding_model: str = Field(default="text-embedding-3-small", env="EMBEDDING_MODEL")
     max_tokens: int = Field(default=4000, env="MAX_TOKENS")
     temperature: float = Field(default=0.3, env="TEMPERATURE")
     
@@ -73,7 +76,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
-        extra = "ignore"  # Ignore extra fields from .env file
+        extra = "ignore"  # Allow extra fields from .env file but ignore them
 
 
 # Global settings instance
@@ -104,3 +107,8 @@ if validation_errors:
     print("⚠️  Configuration warnings:")
     for error in validation_errors:
         print(f"   - {error}")
+
+
+def get_simple_config():
+    """Get simple configuration instance"""
+    return settings

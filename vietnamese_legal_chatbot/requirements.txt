@@ -4,50 +4,65 @@ streamlit==1.29.0
 uvicorn[standard]==0.24.0
 
 # AI/ML Dependencies
-openai==1.6.1
-langchain==0.0.348
-langchain-openai==0.0.2
-langchain-community==0.0.10
-pinecone-client==2.2.4
+openai==1.97.0
+langchain==0.3.27
+langchain-core==0.3.74
+langchain-community==0.3.27
+langchain-text-splitters==0.3.9
+pinecone==7.3.0
+pinecone-plugin-assistant==1.7.0
 
 # Vietnamese Text Processing
 underthesea==6.7.0
 pyvi==0.1.1
 
-# Data Processing
+# Data Processing & Database
 pandas==2.1.4
-numpy==1.24.4
-pydantic==2.5.2
+numpy==2.3.2
+pydantic==2.11.7
+pydantic-settings==2.10.1
+sqlalchemy==2.0.43
 
-# HTTP Client
-requests==2.31.0
-httpx==0.25.2
+# HTTP Client & Async
+requests==2.32.4
+httpx==0.28.1
+aiohttp==3.12.15
+requests-toolbelt==1.0.0
 
 # Environment & Configuration
-python-dotenv==1.0.0
-pydantic-settings==2.1.0
+python-dotenv==1.1.1
+pydantic-settings==2.10.1
 
 # Testing
-pytest==7.4.3
+pytest==8.4.1
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
+dataclasses==0.6
 
 # Development Tools
 black==23.12.0
 flake8==6.1.0
 mypy==1.8.0
 
-# Security
+# Security & Encryption
 cryptography==41.0.8
 
-# Logging
+# Logging & Monitoring
 loguru==0.7.2
 
-# Date/Time
-python-dateutil==2.8.2
+# Date/Time Processing
+python-dateutil==2.9.0.post0
 
-# JSON Processing
-orjson==3.9.10
+# JSON Processing & Serialization
+orjson==3.11.1
+marshmallow==3.26.1
+dataclasses-json==0.6.7
+
+# Additional Dependencies for Vietnamese Legal Processing
+typing-extensions==4.13.2
+typing-inspect==0.9.0
+mypy-extensions==1.1.0
+greenlet==3.2.4
 
 # Session Management
 streamlit-authenticator==0.2.3

@@ -11,7 +11,12 @@ from typing import Dict, List, Optional, Any
 from abc import ABC, abstractmethod
 import logging
 
-from app.utils.simple_config import settings
+try:
+    from app.utils.simple_config import get_simple_config
+    settings = get_simple_config()
+except Exception:
+    from app.utils.demo_config import demo_settings
+    settings = demo_settings
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -32,36 +37,40 @@ class BaseChatModel(ABC):
 class OpenAIChatModel(BaseChatModel):
     """OpenAI chat model implementation"""
     
-    def __init__(self, model_name: str = "gpt-4o-mini", temperature: float = 0.1):
-        """Initialize OpenAI chat model"""
-        self.model_name = model_name
-        self.temperature = temperature
+    def __init__(self, 
+                 api_key: Optional[str] = None,
+                 api_base: Optional[str] = None,
+                 model: str = None, 
+                 temperature: float = None,
+                 max_tokens: int = None):
+        """Initialize OpenAI chat model with flexible configuration"""
+        
+        # Use provided parameters or fall back to demo_settings
+        self.api_key = api_key or demo_settings.openai_chat_api_key
+        self.api_base = api_base or demo_settings.openai_chat_api_base
+        self.model_name = model or demo_settings.chat_model
+        self.temperature = temperature if temperature is not None else demo_settings.temperature
+        self.max_tokens = max_tokens or demo_settings.max_tokens
         
         # Configure OpenAI client for chat
         chat_client_kwargs = {
-            "api_key": settings.openai_api_key,
-            "base_url": settings.openai_api_base
+            "api_key": self.api_key,
+            "base_url": self.api_base
         }
-        
-        if settings.openai_organization_id and settings.openai_organization_id.strip():
-            chat_client_kwargs["organization"] = settings.openai_organization_id
             
         self.chat_client = OpenAI(**chat_client_kwargs)
         
         # Configure separate OpenAI client for embeddings
         embedding_client_kwargs = {
-            "api_key": settings.embedding_api_key,
-            "base_url": settings.embedding_api_base
+            "api_key": demo_settings.openai_embedding_api_key,
+            "base_url": demo_settings.openai_embedding_api_base
         }
-        
-        if settings.embedding_organization_id and settings.embedding_organization_id.strip():
-            embedding_client_kwargs["organization"] = settings.embedding_organization_id
             
         self.embedding_client = OpenAI(**embedding_client_kwargs)
         
-        logger.info(f"Initialized OpenAI chat model: {model_name}")
-        logger.info(f"Chat API: {settings.openai_api_base}")
-        logger.info(f"Embedding API: {settings.embedding_api_base}")
+        logger.info(f"Initialized OpenAI chat model: {self.model_name}")
+        logger.info(f"Chat API: {self.api_base}")
+        logger.info(f"Embedding API: {demo_settings.openai_embedding_api_base}")
     
     def generate_response(self, prompt: str, context: str = None) -> str:
         """Generate response using OpenAI"""
@@ -84,7 +93,7 @@ class OpenAIChatModel(BaseChatModel):
                 model=self.model_name,
                 messages=messages,
                 temperature=self.temperature,
-                max_tokens=settings.max_tokens
+                max_tokens=self.max_tokens
             )
             
             return response.choices[0].message.content
@@ -97,7 +106,7 @@ class OpenAIChatModel(BaseChatModel):
         """Get text embedding using separate embedding API"""
         try:
             response = self.embedding_client.embeddings.create(
-                model=settings.embedding_model,
+                model=demo_settings.embedding_model,
                 input=text
             )
             return response.data[0].embedding

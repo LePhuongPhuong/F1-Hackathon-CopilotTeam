@@ -8,7 +8,7 @@ Xử lý văn bản chuyên biệt cho tài liệu và truy vấn pháp lý ti�
 
 import re
 import unicodedata
-from typing import List, Dict, Optional, Tuple, Set
+from typing import List, Dict, Optional, Tuple, Set, Any
 from dataclasses import dataclass
 import logging
 
@@ -35,6 +35,75 @@ class VietnameseTextProcessor:
         self.legal_terms = self._load_legal_terms()
         self.stopwords = self._load_vietnamese_stopwords()
         self.legal_abbreviations = self._load_legal_abbreviations()
+        
+    def _load_legal_terms(self) -> List[str]:
+        """Load Vietnamese legal terms dictionary"""
+        return [
+            # Quyền và nghĩa vụ
+            "quyền dân sự", "quyền con người", "quyền cơ bản", "nghĩa vụ công dân",
+            "quyền sở hữu", "quyền sử dụng", "quyền thừa kế", "quyền tác giả",
+            
+            # Cơ quan nhà nước
+            "quốc hội", "chính phủ", "thủ tướng", "bộ trưởng", "tòa án",
+            "viện kiểm sát", "công an", "bộ tư pháp", "cục pháp chế",
+            
+            # Văn bản pháp luật
+            "hiến pháp", "luật", "bộ luật", "nghị quyết", "nghị định",
+            "thông tư", "quyết định", "chỉ thị", "pháp lệnh",
+            
+            # Lĩnh vực pháp lý
+            "dân sự", "hình sự", "lao động", "thương mại", "hành chính",
+            "hôn nhân gia đình", "bất động sản", "môi trường", "thuế",
+            
+            # Thủ tục pháp lý
+            "khởi kiện", "tố tụng", "phúc thẩm", "giám đốc thẩm", "thi hành án",
+            "hòa giải", "trọng tài", "bồi thường", "xử phạt", "án phí",
+            
+            # Chủ thể pháp lý
+            "công dân", "pháp nhân", "doanh nghiệp", "tổ chức", "cá nhân",
+            "người lao động", "người sử dụng lao động", "đại diện pháp luật"
+        ]
+    
+    def _load_vietnamese_stopwords(self) -> Set[str]:
+        """Load Vietnamese stopwords for legal text"""
+        return {
+            # Common Vietnamese stopwords
+            "và", "của", "trong", "với", "về", "để", "cho", "từ", "theo",
+            "như", "khi", "nếu", "mà", "này", "đó", "các", "những", "một",
+            "có", "là", "được", "bị", "phải", "cần", "sẽ", "đã", "đang",
+            "tại", "trên", "dưới", "giữa", "ngoài", "bên", "sau", "trước",
+            
+            # Legal-specific stopwords
+            "quy định", "theo như", "căn cứ", "trên cơ sở", "phù hợp",
+            "tuân thủ", "thực hiện", "áp dụng", "ban hành", "có hiệu lực"
+        }
+    
+    def _load_legal_abbreviations(self) -> Dict[str, str]:
+        """Load Vietnamese legal abbreviations"""
+        return {
+            # Government agencies
+            "BTP": "Bộ Tư pháp",
+            "BCA": "Bộ Công an", 
+            "TANDTC": "Tòa án nhân dân tối cao",
+            "VKSTC": "Viện kiểm sát nhân dân tối cao",
+            
+            # Legal documents
+            "NĐ-CP": "Nghị định của Chính phủ",
+            "QĐ-TTg": "Quyết định của Thủ tướng",
+            "TT-BTP": "Thông tư của Bộ Tư pháp",
+            "CV": "Công văn",
+            
+            # Legal codes
+            "BLDS": "Bộ luật Dân sự",
+            "BLHS": "Bộ luật Hình sự", 
+            "BLLD": "Bộ luật Lao động",
+            "BLTM": "Bộ luật Thương mại",
+            
+            # Others
+            "TP.HCM": "Thành phố Hồ Chí Minh",
+            "UBND": "Ủy ban nhân dân",
+            "HĐND": "Hội đồng nhân dân"
+        }
         
     def process_legal_text(self, text: str) -> VietnameseTextAnalysis:
         """Process Vietnamese legal text comprehensively"""
@@ -96,7 +165,7 @@ class VietnameseTextProcessor:
             
             # 6. Standardize quotes
             text = re.sub(r'["""]', '"', text)
-            text = re.sub(r'[''']', "'", text)
+            text = re.sub(r"[''']", "'", text)
             
             return text
             
@@ -288,44 +357,76 @@ class VietnameseTextProcessor:
         """Extract dates in Vietnamese format"""
         entities = []
         
-        date_patterns = [
-            r'(\d{1,2}\/\d{1,2}\/\d{4})',                    # DD/MM/YYYY
-            r'(\d{1,2}-\d{1,2}-\d{4})',                      # DD-MM-YYYY
-            r'ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})', # Vietnamese date format
+        # Vietnamese date patterns
+        patterns = [
+            r'(\d{1,2})/(\d{1,2})/(\d{4})',                    # dd/mm/yyyy
+            r'(\d{1,2})-(\d{1,2})-(\d{4})',                    # dd-mm-yyyy
+            r'ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})',  # Vietnamese format
+            r'(\d{4})-(\d{1,2})-(\d{1,2})',                    # yyyy-mm-dd
         ]
         
-        for pattern in date_patterns:
+        for pattern in patterns:
             matches = re.finditer(pattern, text, re.IGNORECASE)
             for match in matches:
                 entities.append({
                     'type': 'date',
                     'value': match.group(0),
-                    'normalized_date': self._normalize_date(match.group(0))
+                    'raw_match': match.groups()
                 })
         
         return entities
     
     def _extract_names(self, text: str) -> List[Dict[str, str]]:
         """Extract person and organization names"""
-        # TODO: Implement Vietnamese name extraction
-        # This would require more sophisticated NER
-        return []
-    
-    def _extract_procedures(self, text: str) -> List[Dict[str, str]]:
-        """Extract legal procedures"""
         entities = []
         
-        procedure_keywords = [
-            'thủ tục', 'quy trình', 'trình tự', 'hồ sơ',
-            'đăng ký', 'cấp phép', 'xin phép', 'khai báo'
+        # Vietnamese name patterns (basic)
+        # This is a simplified version - real implementation would use NER
+        patterns = [
+            r'(ông|bà|anh|chị)\s+([A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ][a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]*(?:\s+[A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ][a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]*)*)',
+            r'(Công ty|Doanh nghiệp|Tập đoàn|Ngân hàng)\s+([A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ][^,.\n]*)',
         ]
         
-        for keyword in procedure_keywords:
-            if keyword in text.lower():
+        for pattern in patterns:
+            matches = re.finditer(pattern, text)
+            for match in matches:
+                if 'ông|bà|anh|chị' in pattern:
+                    entities.append({
+                        'type': 'person',
+                        'value': match.group(0),
+                        'title': match.group(1),
+                        'name': match.group(2)
+                    })
+                else:
+                    entities.append({
+                        'type': 'organization',
+                        'value': match.group(0),
+                        'org_type': match.group(1),
+                        'org_name': match.group(2)
+                    })
+        
+        return entities
+    
+    def _extract_procedures(self, text: str) -> List[Dict[str, str]]:
+        """Extract legal procedures and processes"""
+        entities = []
+        
+        # Legal procedure patterns
+        procedures = [
+            'khởi kiện', 'tố tụng', 'phúc thẩm', 'giám đốc thẩm',
+            'hòa giải', 'trọng tài', 'thi hành án', 'cưỡng chế',
+            'kháng cáo', 'kháng nghị', 'tạm giam', 'tạm giữ',
+            'điều tra', 'truy tố', 'xét xử', 'tuyên án'
+        ]
+        
+        for procedure in procedures:
+            pattern = r'\b' + re.escape(procedure) + r'\b'
+            matches = re.finditer(pattern, text, re.IGNORECASE)
+            for match in matches:
                 entities.append({
                     'type': 'legal_procedure',
-                    'keyword': keyword,
-                    'context': self._get_context_around_keyword(text, keyword)
+                    'value': match.group(0),
+                    'procedure_type': procedure
                 })
         
         return entities
@@ -345,11 +446,81 @@ class VietnameseTextProcessor:
         # Simple heuristic based on Vietnamese characters
         vietnamese_chars = 'àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ'
         
-        vietnamese_count = sum(1 for char in text.lower() if char in vietnamese_chars)
-        total_chars = len([char for char in text if char.isalpha()])
-        
+        total_chars = len([c for c in text.lower() if c.isalpha()])
         if total_chars == 0:
             return 0.0
+        
+        vietnamese_char_count = len([c for c in text.lower() if c in vietnamese_chars])
+        confidence = vietnamese_char_count / total_chars
+        
+        # Boost confidence if common Vietnamese words are found
+        common_vn_words = ['và', 'của', 'trong', 'với', 'về', 'cho', 'từ', 'theo', 'như']
+        word_boost = sum(1 for word in common_vn_words if word in text.lower()) * 0.05
+        
+        return min(1.0, confidence + word_boost)
+    
+    def get_legal_domain(self, text: str) -> str:
+        """Determine legal domain from Vietnamese text"""
+        text_lower = text.lower()
+        
+        # Legal domain keywords
+        domain_keywords = {
+            'dan_su': ['dân sự', 'hợp đồng', 'tài sản', 'quyền sở hữu', 'bồi thường', 'thừa kế'],
+            'hinh_su': ['hình sự', 'tội phạm', 'hình phạt', 'án tù', 'vi phạm pháp luật'],
+            'lao_dong': ['lao động', 'người lao động', 'hợp đồng lao động', 'bảo hiểm xã hội', 'thời gian làm việc'],
+            'thuong_mai': ['thương mại', 'kinh doanh', 'công ty', 'doanh nghiệp', 'đăng ký kinh doanh'],
+            'hanh_chinh': ['hành chính', 'thủ tục', 'cấp phép', 'đăng ký', 'giấy phép']
+        }
+        
+        domain_scores = {}
+        for domain, keywords in domain_keywords.items():
+            score = sum(1 for keyword in keywords if keyword in text_lower)
+            if score > 0:
+                domain_scores[domain] = score
+        
+        if domain_scores:
+            return max(domain_scores, key=domain_scores.get)
+        
+        return 'general'
+    
+    def extract_legal_citations(self, text: str) -> List[Dict[str, str]]:
+        """Extract Vietnamese legal citations"""
+        citations = []
+        
+        # Legal citation patterns
+        patterns = [
+            # Law citations
+            r'(Luật|Bộ luật)\s+([^,.\n\d]+)\s+(\d{4})',
+            # Article citations  
+            r'Điều\s+(\d+)\s+(Luật|Bộ luật)\s+([^,.\n\d]+)\s+(\d{4})',
+            # Decree citations
+            r'Nghị định\s+(\d+)/(\d{4})/NĐ-CP',
+            # Circular citations
+            r'Thông tư\s+(\d+)/(\d{4})/TT-([A-Z]+)',
+        ]
+        
+        for pattern in patterns:
+            matches = re.finditer(pattern, text, re.IGNORECASE)
+            for match in matches:
+                citation = {
+                    'type': 'legal_citation',
+                    'full_text': match.group(0),
+                    'groups': match.groups()
+                }
+                
+                # Parse specific citation types
+                if 'Luật' in match.group(0) or 'Bộ luật' in match.group(0):
+                    citation['citation_type'] = 'law'
+                elif 'Nghị định' in match.group(0):
+                    citation['citation_type'] = 'decree'
+                elif 'Thông tư' in match.group(0):
+                    citation['citation_type'] = 'circular'
+                elif 'Điều' in match.group(0):
+                    citation['citation_type'] = 'article'
+                
+                citations.append(citation)
+        
+        return citations
         
         return min(vietnamese_count / total_chars * 2, 1.0)  # Scale up for better sensitivity
     
@@ -493,3 +664,80 @@ class VietnameseQueryPreprocessor:
                 break
         
         return constraints
+
+
+# Utility functions for external use
+def process_vietnamese_legal_text(text: str) -> VietnameseTextAnalysis:
+    """Quick function to process Vietnamese legal text"""
+    processor = VietnameseTextProcessor()
+    return processor.process_legal_text(text)
+
+def preprocess_vietnamese_query(query: str) -> Dict[str, Any]:
+    """Quick function to preprocess Vietnamese legal query"""
+    preprocessor = VietnameseQueryPreprocessor()
+    return preprocessor.preprocess_query(query)
+
+def extract_legal_terms(text: str) -> List[str]:
+    """Quick function to extract legal terms from text"""
+    processor = VietnameseTextProcessor()
+    return processor.extract_legal_terms(text)
+
+def get_legal_domain(text: str) -> str:
+    """Quick function to get legal domain from text"""
+    processor = VietnameseTextProcessor()
+    return processor.get_legal_domain(text)
+
+def extract_legal_citations(text: str) -> List[Dict[str, str]]:
+    """Quick function to extract legal citations"""
+    processor = VietnameseTextProcessor()
+    return processor.extract_legal_citations(text)
+
+def normalize_vietnamese_text(text: str) -> str:
+    """Quick function to normalize Vietnamese text"""
+    processor = VietnameseTextProcessor()
+    return processor.normalize_vietnamese_text(text)
+
+# Test function
+def test_vietnamese_text_processing():
+    """Test Vietnamese text processing functions"""
+    
+    # Test texts
+    test_texts = [
+        "Quyền dân sự của công dân được bảo vệ như thế nào?",
+        "Điều 15 Bộ luật Dân sự 2015 quy định gì về quyền sở hữu?",
+        "Thời gian làm việc theo Bộ luật Lao động 2019 là bao lâu?",
+        "Công ty tôi yêu cầu làm việc 10 giờ/ngày có vi phạm không?"
+    ]
+    
+    print("🇻🇳 VIETNAMESE TEXT PROCESSING TEST")
+    print("=" * 60)
+    
+    for i, text in enumerate(test_texts, 1):
+        print(f"\n📋 TEST {i}: {text}")
+        print("-" * 40)
+        
+        # Process text
+        analysis = process_vietnamese_legal_text(text)
+        print(f"✅ Normalized: {analysis.normalized_text}")
+        print(f"🔍 Legal terms: {analysis.legal_terms}")
+        print(f"🏷️ Entities: {len(analysis.entities)} found")
+        print(f"🌏 Language confidence: {analysis.language_confidence:.2f}")
+        
+        # Preprocess query
+        query_info = preprocess_vietnamese_query(text)
+        print(f"🎯 Intent: {query_info['intent']}")
+        print(f"🔑 Keywords: {query_info['search_keywords'][:5]}")  # Show first 5
+        print(f"📚 Domain: {get_legal_domain(text)}")
+        
+        # Extract citations
+        citations = extract_legal_citations(text)
+        if citations:
+            print(f"📖 Citations: {len(citations)} found")
+            for citation in citations:
+                print(f"   - {citation['full_text']} ({citation['citation_type']})")
+    
+    print(f"\n{'='*60}")
+    print("🎉 Vietnamese text processing test completed!")
+
+if __name__ == "__main__":
+    test_vietnamese_text_processing()

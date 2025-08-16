@@ -15,14 +15,17 @@ from typing import List, Dict, Any
 # Add app directory to Python path
 sys.path.append(str(Path(__file__).parent.parent))
 
-# TODO: Import khi implement
-# import pinecone
-# from app.utils.config import settings
-# from app.services.pinecone_service import PineconeService
-# from app.services.document_processor import VietnameseLegalDocumentProcessor
+# Implemented imports
+import pinecone
+from app.utils.demo_config import demo_settings
+from app.services.pinecone_service import PineconeService
 
 def setup_logging():
     """Setup logging for setup script"""
+    # Create logs directory if it doesn't exist
+    logs_dir = Path('logs')
+    logs_dir.mkdir(exist_ok=True)
+    
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -58,36 +61,31 @@ def create_pinecone_index():
     try:
         logging.info("Creating Pinecone index...")
         
-        # TODO: Implement Pinecone index creation
-        # pinecone.init(
-        #     api_key=settings.pinecone_api_key,
-        #     environment=settings.pinecone_environment
-        # )
+        # Initialize Pinecone service
+        pinecone_service = PineconeService(
+            api_key=demo_settings.pinecone_api_key,
+            environment=demo_settings.pinecone_environment,
+            index_name=demo_settings.pinecone_index_name,
+            openai_api_key=demo_settings.openai_embedding_api_key
+        )
         
         # Check if index already exists
-        # existing_indexes = pinecone.list_indexes()
-        # if settings.pinecone_index_name in existing_indexes:
-        #     logging.info(f"Index {settings.pinecone_index_name} already exists")
-        #     return True
+        if pinecone_service.index_exists():
+            logging.info(f"Index {demo_settings.pinecone_index_name} already exists")
+            return True
         
         # Create index with optimal settings for Vietnamese legal documents
-        # pinecone.create_index(
-        #     name=settings.pinecone_index_name,
-        #     dimension=settings.pinecone_dimension,  # 1536 for OpenAI embeddings
-        #     metric='cosine',
-        #     metadata_config={
-        #         "indexed": [
-        #             "legal_domain",
-        #             "document_type", 
-        #             "language",
-        #             "article_number",
-        #             "effective_date"
-        #         ]
-        #     }
-        # )
+        success = pinecone_service.create_index(
+            dimension=1536,  # OpenAI text-embedding-3-small dimension
+            metric='cosine'
+        )
         
-        logging.info(f"Successfully created Pinecone index: {os.getenv('PINECONE_INDEX_NAME')}")
-        return True
+        if success:
+            logging.info(f"Successfully created Pinecone index: {demo_settings.pinecone_index_name}")
+            return True
+        else:
+            logging.error("Failed to create Pinecone index")
+            return False
         
     except Exception as e:
         logging.error(f"Failed to create Pinecone index: {e}")
@@ -98,31 +96,35 @@ def load_sample_legal_documents():
     try:
         logging.info("Loading sample Vietnamese legal documents...")
         
-        # TODO: Implement document loading
+        # Get sample documents
         sample_documents = get_sample_documents()
         
-        # Process and upload documents
-        # processor = VietnameseLegalDocumentProcessor()
-        # pinecone_service = PineconeService(
-        #     api_key=settings.pinecone_api_key,
-        #     environment=settings.pinecone_environment,
-        #     index_name=settings.pinecone_index_name
-        # )
+        # Initialize Pinecone service
+        pinecone_service = PineconeService(
+            api_key=demo_settings.pinecone_api_key,
+            environment=demo_settings.pinecone_environment,
+            index_name=demo_settings.pinecone_index_name,
+            openai_api_key=demo_settings.openai_embedding_api_key
+        )
         
         processed_count = 0
         for doc_info in sample_documents:
             try:
                 logging.info(f"Processing document: {doc_info['title']}")
                 
-                # TODO: Process and upload document
-                # processed_doc = processor.process_legal_document(doc_info['content'])
-                # success = pinecone_service.upsert_documents([processed_doc])
+                # Create document structure for Pinecone
+                document_data = {
+                    'id': f"doc_{processed_count}",
+                    'text': doc_info['content'],
+                    'metadata': doc_info['metadata']
+                }
                 
-                # if success:
-                #     processed_count += 1
-                #     logging.info(f"Successfully uploaded: {doc_info['title']}")
+                # Upload to Pinecone
+                success = pinecone_service.upsert_documents([document_data])
                 
-                processed_count += 1  # Placeholder
+                if success:
+                    processed_count += 1
+                    logging.info(f"Successfully uploaded: {doc_info['title']}")
                 
             except Exception as e:
                 logging.error(f"Failed to process document {doc_info['title']}: {e}")
@@ -201,23 +203,24 @@ def test_pinecone_connection():
     try:
         logging.info("Testing Pinecone connection...")
         
-        # TODO: Implement connection test
-        # pinecone_service = PineconeService(
-        #     api_key=settings.pinecone_api_key,
-        #     environment=settings.pinecone_environment,
-        #     index_name=settings.pinecone_index_name
-        # )
+        # Initialize Pinecone service
+        pinecone_service = PineconeService(
+            api_key=demo_settings.pinecone_api_key,
+            environment=demo_settings.pinecone_environment,
+            index_name=demo_settings.pinecone_index_name,
+            openai_api_key=demo_settings.openai_embedding_api_key
+        )
         
         # Test basic operations
-        # stats = pinecone_service.get_index_stats()
-        # logging.info(f"Index stats: {stats}")
+        stats = pinecone_service.get_index_stats()
+        logging.info(f"Index stats: {stats}")
         
         # Test search with sample query
-        # results = pinecone_service.search_similar_documents(
-        #     query="quyền thành lập doanh nghiệp",
-        #     top_k=3
-        # )
-        # logging.info(f"Test search returned {len(results)} results")
+        results = pinecone_service.search_similar_documents(
+            query="quyền thành lập doanh nghiệp",
+            top_k=3
+        )
+        logging.info(f"Test search returned {len(results)} results")
         
         logging.info("Pinecone connection test successful")
         return True

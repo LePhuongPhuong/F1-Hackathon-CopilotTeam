@@ -16,10 +16,16 @@ load_dotenv()
 class Settings(BaseSettings):
     """Application settings with environment variable support"""
     
-    # API Keys
+    # API Keys - Chat Model
     openai_api_key: str = Field(..., env="OPENAI_API_KEY")
     openai_api_base: str = Field(default="https://api.openai.com/v1", env="OPENAI_API_BASE")
     openai_organization_id: Optional[str] = Field(default=None, env="OPENAI_ORGANIZATION_ID")
+    
+    # API Keys - Embedding Model (separate)
+    openai_embedding_api_key: Optional[str] = Field(default=None, env="OPENAI_EMBEDDING_API_KEY")
+    openai_embedding_api_base: str = Field(default="https://api.openai.com/v1", env="OPENAI_EMBEDDING_API_BASE")
+    
+    # Pinecone Configuration
     pinecone_api_key: str = Field(..., env="PINECONE_API_KEY")
     
     # Pinecone Configuration
@@ -39,7 +45,8 @@ class Settings(BaseSettings):
     streamlit_port: int = Field(default=8501, env="STREAMLIT_PORT")
     
     # AI Configuration
-    embedding_model: str = Field(default="text-embedding-ada-002", env="EMBEDDING_MODEL")
+    chat_model: str = Field(default="gpt-4o-mini", env="CHAT_MODEL")
+    embedding_model: str = Field(default="text-embedding-3-small", env="EMBEDDING_MODEL")
     max_tokens: int = Field(default=4000, env="MAX_TOKENS")
     temperature: float = Field(default=0.1, env="TEMPERATURE")
     
