@@ -189,7 +189,6 @@ def main():
         render_chat_interface()
     
     with right_sidebar:
-        render_document_library()
         render_legal_references()
     
     # Render footer
@@ -286,10 +285,7 @@ def render_quick_actions():
     if st.button("➕ Đặt câu hỏi mới", use_container_width=True):
         st.session_state.new_question = True
         
-    if st.button("📤 Tải lên tài liệu", use_container_width=True):
-        st.session_state.upload_document = True
-        
-    if st.button("🔍 Tìm luật liên quan", use_container_width=True):
+    if st.button(" Tìm luật liên quan", use_container_width=True):
         st.session_state.search_laws = True
 
 def render_chat_interface():
@@ -363,34 +359,6 @@ def render_chat_interface():
     with col3:
         if st.button("📥 Xuất lịch sử", use_container_width=True):
             export_chat_history()
-
-def render_document_library():
-    """Render document library sidebar"""
-    st.markdown("### 📚 Thư viện Tài liệu")
-    
-    # Document upload
-    uploaded_file = st.file_uploader(
-        "Tải lên tài liệu",
-        type=['pdf', 'docx', 'txt'],
-        help="Hỗ trợ PDF, DOCX, TXT"
-    )
-    
-    if uploaded_file:
-        st.success(f"✅ Đã tải lên: {uploaded_file.name}")
-        if st.button("🔍 Phân tích tài liệu"):
-            analyze_document(uploaded_file)
-    
-    # Recent documents
-    st.markdown("**📋 Tài liệu gần đây:**")
-    recent_docs = [
-        "Luật Dân sự 2015.pdf",
-        "Nghị định 44-2016.docx", 
-        "Thông tư 15-2016.pdf"
-    ]
-    
-    for doc in recent_docs:
-        if st.button(f"📄 {doc}", key=f"doc_{doc}"):
-            st.info(f"Đang mở {doc}...")
 
 def render_legal_references():
     """Render legal references sidebar"""
@@ -527,12 +495,6 @@ def get_ai_response(question: str) -> Dict:
     
     return demo_response
 
-def analyze_document(uploaded_file):
-    """Analyze uploaded document"""
-    st.info("🔄 Đang phân tích tài liệu...")
-    # TODO: Implement document analysis
-    st.success("✅ Phân tích hoàn tất!")
-
 def export_chat_history():
     """Export chat history to file"""
     if st.session_state.chat_history:
@@ -557,11 +519,6 @@ def export_chat_history():
 def render_sidebar():
     """Render sidebar with legal domains and options"""
     # TODO: Implement sidebar
-    pass
-
-def render_document_upload():
-    """Render document upload component"""
-    # TODO: Implement document upload
     pass
 
 def render_chat_history():

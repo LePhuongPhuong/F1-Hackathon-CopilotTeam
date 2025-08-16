@@ -5,7 +5,8 @@ Quản lý cấu hình cho Chatbot AI Pháp lý Việt Nam
 
 import os
 from typing import List, Optional
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -17,6 +18,8 @@ class Settings(BaseSettings):
     
     # API Keys
     openai_api_key: str = Field(..., env="OPENAI_API_KEY")
+    openai_api_base: str = Field(default="https://api.openai.com/v1", env="OPENAI_API_BASE")
+    openai_organization_id: Optional[str] = Field(default=None, env="OPENAI_ORGANIZATION_ID")
     pinecone_api_key: str = Field(..., env="PINECONE_API_KEY")
     
     # Pinecone Configuration
@@ -42,30 +45,14 @@ class Settings(BaseSettings):
     
     # Vietnamese Legal Configuration
     default_language: str = Field(default="vietnamese", env="DEFAULT_LANGUAGE")
-    legal_domains: List[str] = Field(
-        default=[
-            "hien_phap",      # Hiến pháp
-            "dan_su",         # Dân sự  
-            "hinh_su",        # Hình sự
-            "lao_dong",       # Lao động
-            "thuong_mai",     # Thương mại
-            "hanh_chinh",     # Hành chính
-            "thue",           # Thuế
-            "bat_dong_san"    # Bất động sản
-        ],
+    legal_domains: str = Field(
+        default="hien_phap,dan_su,hinh_su,lao_dong,thuong_mai,hanh_chinh,thue,bat_dong_san",
         env="LEGAL_DOMAINS"
     )
     
     # Security
     secret_key: str = Field(..., env="SECRET_KEY")
     access_token_expire_minutes: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
-    
-    # File Upload Configuration
-    max_file_size_mb: int = Field(default=10, env="MAX_FILE_SIZE_MB")
-    allowed_file_types: List[str] = Field(
-        default=["pdf", "docx", "txt"], 
-        env="ALLOWED_FILE_TYPES"
-    )
     
     # Performance Configuration
     max_concurrent_requests: int = Field(default=100, env="MAX_CONCURRENT_REQUESTS")
@@ -84,6 +71,13 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+    
+    @property
+    def legal_domains_list(self) -> List[str]:
+        """Get legal domains as a list"""
+        if isinstance(self.legal_domains, str):
+            return [domain.strip() for domain in self.legal_domains.split(",")]
+        return self.legal_domains
 
 
 class VietnameseLegalDomains:

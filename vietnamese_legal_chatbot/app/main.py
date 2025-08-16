@@ -2,13 +2,13 @@
 FastAPI Backend for Vietnamese Legal AI Chatbot
 Backend FastAPI cho Chatbot AI Pháp lý Việt Nam
 
-Main entry point for the REST API serving legal queries and document processing.
-Điểm vào chính cho REST API phục vụ truy vấn pháp lý và xử lý tài liệu.
+Main entry point for the REST API serving legal queries.
+Điểm vào chính cho REST API phục vụ truy vấn pháp lý.
 """
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
@@ -35,14 +35,6 @@ class LegalResponse(BaseModel):
     domain: str = Field(..., description="Identified legal domain")
     timestamp: datetime = Field(default_factory=datetime.now)
     warnings: List[str] = Field(default=[], description="Legal warnings")
-
-class DocumentUpload(BaseModel):
-    """Model for document upload response"""
-    filename: str
-    size: int
-    document_type: str
-    analysis_status: str
-    extracted_text_preview: str
 
 class ChatHistory(BaseModel):
     """Model for chat history"""
@@ -163,7 +155,6 @@ async def root():
         "compliance": "Tuân thủ Thông tư 20/2018/TT-BTTTT",
         "endpoints": {
             "legal_query": "/api/legal-query",
-            "upload_document": "/api/upload-document", 
             "legal_domains": "/api/legal-domains",
             "chat_history": "/api/chat-history"
         }
@@ -216,62 +207,6 @@ async def process_legal_query(query: LegalQuery):
     except Exception as e:
         logger.error(f"Error processing legal query: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-@app.post("/api/upload-document", response_model=DocumentUpload, tags=["Documents"])
-async def upload_legal_document(
-    file: UploadFile = File(...),
-    background_tasks: BackgroundTasks = BackgroundTasks()
-):
-    """
-    Upload and process legal document
-    Tải lên và xử lý tài liệu pháp lý
-    """
-    try:
-        # Validate file type
-        allowed_types = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"]
-        if file.content_type not in allowed_types:
-            raise HTTPException(
-                status_code=400,
-                detail="Unsupported file type. Allowed: PDF, DOCX, TXT"
-            )
-        
-        # Validate file size (max 10MB)
-        max_size = 10 * 1024 * 1024  # 10MB
-        file_content = await file.read()
-        if len(file_content) > max_size:
-            raise HTTPException(
-                status_code=400,
-                detail="File size exceeds maximum limit of 10MB"
-            )
-        
-        # Save file temporarily
-        upload_dir = Path("data/uploads")
-        upload_dir.mkdir(exist_ok=True)
-        
-        file_path = upload_dir / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
-        with open(file_path, "wb") as f:
-            f.write(file_content)
-        
-        # Extract preview text
-        preview_text = extract_text_preview(file_content, file.content_type)
-        
-        # Schedule background processing
-        background_tasks.add_task(process_document_background, str(file_path))
-        
-        response = DocumentUpload(
-            filename=file.filename,
-            size=len(file_content),
-            document_type=file.content_type,
-            analysis_status="processing",
-            extracted_text_preview=preview_text
-        )
-        
-        logger.info(f"Document uploaded successfully: {file.filename}")
-        return response
-        
-    except Exception as e:
-        logger.error(f"Error uploading document: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 @app.get("/api/legal-domains", tags=["Legal"])
 async def get_legal_domains():
@@ -424,50 +359,7 @@ Dựa trên câu hỏi: "{query.question}"
         ]
     )
 
-def extract_text_preview(file_content: bytes, content_type: str) -> str:
-    """Extract preview text from uploaded document"""
-    # TODO: Implement actual text extraction for PDF, DOCX
-    preview = f"Preview of {content_type} document ({len(file_content)} bytes)"
-    return preview[:200] + "..." if len(preview) > 200 else preview
-
-async def process_document_background(file_path: str):
-    """Background task to process uploaded document"""
-    logger.info(f"Starting background processing for: {file_path}")
-    # TODO: Implement document processing, text extraction, legal analysis
-    logger.info(f"Completed background processing for: {file_path}")
-
-# TODO: Implement endpoints
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "service": "vietnamese-legal-chatbot"}
-
-# TODO: Legal Query Endpoints
-@app.post("/api/legal-query")
-async def process_legal_query():
-    """Process legal query and return AI response"""
-    pass
-
-@app.post("/api/upload-document")
-async def upload_legal_document():
-    """Upload and process legal document"""
-    pass
-
-@app.get("/api/legal-domains")
-async def get_legal_domains():
-    """Get list of supported Vietnamese legal domains"""
-    pass
-
-@app.get("/api/chat-history")
-async def get_chat_history():
-    """Get user chat history"""
-    pass
-
-@app.post("/api/export-chat")
-async def export_chat_history():
-    """Export chat history to CSV/JSON"""
-    pass
-
+# Development server runner
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
