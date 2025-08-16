@@ -10,12 +10,6 @@ langchain-openai==0.0.2
 langchain-community==0.0.10
 pinecone-client==2.2.4
 
-# Document Processing
-PyPDF2==3.0.1
-python-docx==1.1.0
-python-multipart==0.0.6
-unstructured==0.11.8
-
 # Vietnamese Text Processing
 underthesea==6.7.0
 pyvi==0.1.1
@@ -57,6 +51,3 @@ orjson==3.9.10
 
 # Session Management
 streamlit-authenticator==0.2.3
-
-# Export Functionality
-openpyxl==3.1.2

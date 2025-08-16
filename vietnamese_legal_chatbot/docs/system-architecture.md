@@ -47,8 +47,6 @@ graph TB
     subgraph "Application Layer"
         C1[Legal RAG Engine]
         C2[Vietnamese Text Processor]
-        C3[Document Service]
-        C4[User Management]
     end
     
     subgraph "AI/ML Layer"
@@ -60,9 +58,6 @@ graph TB
     
     subgraph "Data Layer"
         E1[Pinecone Vector DB]
-        E2[PostgreSQL]
-        E3[Redis Cache]
-        E4[File Storage]
     end
     
     A1 --> B1
@@ -70,9 +65,6 @@ graph TB
     C1 --> D1
     C1 --> E1
     C2 --> D4
-    C3 --> E4
-    C4 --> E2
-    B2 --> E3
 ```
 
 ---
@@ -87,7 +79,6 @@ graph TB
         U1[Vietnamese Citizens]
         U2[Legal Professionals]
         U3[System Administrators]
-        U4[Content Managers]
     end
     
     subgraph "Vietnamese Legal AI Chatbot System"
@@ -97,7 +88,6 @@ graph TB
     subgraph "External Services"
         E1[OpenAI API<br/>GPT-4 & Embeddings]
         E2[Pinecone Cloud<br/>Vector Database]
-        E3[Email Service<br/>SMTP Provider]
         E4[Monitoring Service<br/>Application Insights]
     end
     
@@ -108,13 +98,11 @@ graph TB
     end
     
     U1 -->|Legal Questions<br/>Vietnamese Language| SYS
-    U2 -->|Document Upload<br/>Legal Research| SYS
+    U2 -->|Legal Research| SYS
     U3 -->|System Management<br/>Monitoring| SYS
-    U4 -->|Content Management<br/>Document Review| SYS
-    
+
     SYS -->|AI Processing<br/>Text Generation| E1
     SYS -->|Vector Search<br/>Document Retrieval| E2
-    SYS -->|Notifications<br/>User Communication| E3
     SYS -->|Performance Metrics<br/>Error Logs| E4
     
     D1 -->|Legal Content<br/>Document Ingestion| SYS
@@ -148,26 +136,16 @@ graph TB
         NLP[Vietnamese NLP Service<br/>Text Analysis]
     end
     
-    subgraph "Data Containers"
-        POSTGRES[PostgreSQL<br/>User Data & History]
-        REDIS[Redis<br/>Session & Cache]
-        STORAGE[File Storage<br/>Document Repository]
-    end
-    
     subgraph "External Services"
         OPENAI[OpenAI API<br/>GPT-4 & Embeddings]
         PINECONE[Pinecone<br/>Vector Database]
     end
     
     WEB --> LB
-    MOB --> LB
     LB --> ST
     ST -.->|API Calls| API
     API --> RAG
     API --> NLP
-    API --> POSTGRES
-    API --> REDIS
-    API --> STORAGE
     RAG --> OPENAI
     RAG --> PINECONE
     NLP --> OPENAI
@@ -191,7 +169,6 @@ graph TB
         
         subgraph "Business Logic Layer"
             CHAT[Chat Controller]
-            DOC[Document Controller]
             USER[User Controller]
             ADMIN[Admin Controller]
         end
@@ -199,50 +176,39 @@ graph TB
         subgraph "Service Layer"
             LEGAL[Legal Service]
             RAGSERVICE[RAG Service]
-            DOCSERVICE[Document Service]
             USERSERVICE[User Service]
             ANALYTICS[Analytics Service]
         end
         
         subgraph "Core Components"
             RAG[Vietnamese Legal RAG]
-            PROCESSOR[Document Processor]
             CLASSIFIER[Legal Domain Classifier]
             EXTRACTOR[Vietnamese Text Extractor]
         end
         
         subgraph "Data Access Layer"
             PINECONE_DAO[Pinecone DAO]
-            POSTGRES_DAO[PostgreSQL DAO]
-            REDIS_DAO[Redis DAO]
-            FILE_DAO[File Storage DAO]
         end
     end
     
     subgraph "External Integrations"
         OPENAI_CLIENT[OpenAI Client]
         PINECONE_CLIENT[Pinecone Client]
-        EMAIL_CLIENT[Email Client]
     end
     
     AUTH --> USERSERVICE
     CHAT --> LEGAL
-    DOC --> DOCSERVICE
     USER --> USERSERVICE
     ADMIN --> ANALYTICS
     
     LEGAL --> RAG
     RAGSERVICE --> RAG
-    DOCSERVICE --> PROCESSOR
     
     RAG --> CLASSIFIER
     RAG --> OPENAI_CLIENT
-    PROCESSOR --> EXTRACTOR
     CLASSIFIER --> PINECONE_DAO
     
     PINECONE_DAO --> PINECONE_CLIENT
-    POSTGRES_DAO -.-> POSTGRES_CLIENT
-    REDIS_DAO -.-> REDIS_CLIENT
 ```
 
 ### Frontend Component Diagram | Sơ đồ Component Frontend
@@ -252,7 +218,6 @@ graph TB
     subgraph "Streamlit Application"
         subgraph "UI Components"
             CHAT_UI[Chat Interface<br/>Vietnamese Input/Output]
-            DOC_UI[Document Upload UI<br/>Drag & Drop]
             PROFILE_UI[User Profile UI<br/>Settings & Preferences]
             ADMIN_UI[Admin Dashboard UI<br/>Analytics & Management]
         end
@@ -266,7 +231,6 @@ graph TB
         subgraph "API Integration"
             API_CLIENT[FastAPI Client<br/>HTTP Requests]
             WEBSOCKET[WebSocket Client<br/>Real-time Updates]
-            FILE_UPLOAD[File Upload Handler<br/>Progress Tracking]
         end
         
         subgraph "Vietnamese Language Support"
@@ -286,9 +250,6 @@ graph TB
     CHAT_UI --> API_CLIENT
     CHAT_UI --> INPUT
     
-    DOC_UI --> FILE_UPLOAD
-    DOC_UI --> API_CLIENT
-    
     PROFILE_UI --> SESSION
     PROFILE_UI --> API_CLIENT
     
@@ -296,7 +257,6 @@ graph TB
     ADMIN_UI --> API_CLIENT
     
     API_CLIENT --> ERROR
-    FILE_UPLOAD --> LOADING
     
     SESSION --> CACHE
     SESSION --> HISTORY
@@ -317,89 +277,32 @@ sequenceDiagram
     participant NLP as Vietnamese NLP
     participant PC as Pinecone
     participant OAI as OpenAI API
-    participant PG as PostgreSQL
-    participant RD as Redis
     
     U->>ST: Enter Vietnamese legal question
     ST->>API: POST /api/legal-query
     
-    API->>RD: Check query cache
-    alt Cache Hit
-        RD-->>API: Return cached response
-        API-->>ST: Return response
-    else Cache Miss
-        API->>NLP: Analyze Vietnamese text
-        NLP->>NLP: Tokenize & normalize text
-        NLP->>NLP: Extract legal entities
-        NLP-->>API: Return analysis results
-        
-        API->>RAG: Process legal query
-        RAG->>NLP: Classify legal domain
-        NLP-->>RAG: Return domain classification
-        
-        RAG->>OAI: Generate query embedding
-        OAI-->>RAG: Return embedding vector
-        
-        RAG->>PC: Search similar documents
-        PC-->>RAG: Return relevant documents
-        
-        RAG->>OAI: Generate response with context
-        OAI-->>RAG: Return AI response
-        
-        RAG-->>API: Return structured response
-        API->>RD: Cache response
-        API->>PG: Log query & response
-        API-->>ST: Return response
-    end
+    API->>NLP: Analyze Vietnamese text
+    NLP->>NLP: Tokenize & normalize text
+    NLP->>NLP: Extract legal entities
+    NLP-->>API: Return analysis results
+    
+    API->>RAG: Process legal query
+    RAG->>NLP: Classify legal domain
+    NLP-->>RAG: Return domain classification
+    
+    RAG->>OAI: Generate query embedding
+    OAI-->>RAG: Return embedding vector
+    
+    RAG->>PC: Search similar documents
+    PC-->>RAG: Return relevant documents
+    
+    RAG->>OAI: Generate response with context
+    OAI-->>RAG: Return AI response
+    
+    RAG-->>API: Return structured response
+    API-->>ST: Return response
     
     ST-->>U: Display Vietnamese legal advice
-```
-
-### Document Upload Processing Flow | Luồng Xử lý Tải lên Tài liệu
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant ST as Streamlit Frontend
-    participant API as FastAPI Backend
-    participant DOC as Document Processor
-    participant NLP as Vietnamese NLP
-    participant PC as Pinecone
-    participant FS as File Storage
-    participant PG as PostgreSQL
-    
-    U->>ST: Select Vietnamese legal document
-    ST->>API: POST /api/upload-document (multipart)
-    
-    API->>FS: Store temporary file
-    FS-->>API: Return file path
-    
-    API->>DOC: Process document
-    DOC->>DOC: Validate file format
-    DOC->>DOC: Extract Vietnamese text
-    DOC->>NLP: Analyze legal content
-    
-    NLP->>NLP: Identify legal entities
-    NLP->>NLP: Classify legal domain
-    NLP->>NLP: Extract key concepts
-    NLP-->>DOC: Return analysis results
-    
-    DOC->>DOC: Chunk document text
-    DOC->>PC: Generate embeddings
-    PC-->>DOC: Return embedding vectors
-    
-    DOC->>PC: Store document chunks
-    PC-->>DOC: Confirm storage
-    
-    DOC->>FS: Move to permanent storage
-    FS-->>DOC: Confirm storage
-    
-    DOC->>PG: Save document metadata
-    PG-->>DOC: Confirm save
-    
-    DOC-->>API: Return processing results
-    API-->>ST: Return success response
-    ST-->>U: Show upload confirmation
 ```
 
 ### User Authentication Flow | Luồng Xác thực Người dùng
@@ -410,22 +313,14 @@ sequenceDiagram
     participant ST as Streamlit Frontend
     participant API as FastAPI Backend
     participant AUTH as Auth Service
-    participant PG as PostgreSQL
-    participant RD as Redis
-    participant EMAIL as Email Service
     
     U->>ST: Enter login credentials
     ST->>API: POST /api/auth/login
     
     API->>AUTH: Validate credentials
-    AUTH->>PG: Query user data
-    PG-->>AUTH: Return user info
-    
     AUTH->>AUTH: Verify password hash
     alt Valid Credentials
-        AUTH->>RD: Generate session token
-        RD-->>AUTH: Return token
-        AUTH->>PG: Update last login
+        AUTH->>AUTH: Generate session token
         AUTH-->>API: Return user data & token
         API-->>ST: Return success + token
         ST->>ST: Store session state
@@ -436,64 +331,30 @@ sequenceDiagram
         ST-->>U: Show error message
     end
     
-    Note over U,EMAIL: New User Registration
+    Note over U,AUTH: New User Registration
     U->>ST: Register new account
     ST->>API: POST /api/auth/register
     API->>AUTH: Create user account
-    AUTH->>PG: Save user data
-    AUTH->>EMAIL: Send verification email
-    EMAIL-->>U: Verification email
-    U->>EMAIL: Click verification link
-    EMAIL->>API: Verify email token
-    API->>AUTH: Activate account
-    AUTH-->>U: Account activated
+    AUTH-->>U: Account created
 ```
 
 ---
 
 ## 🚀 Deployment Architecture | Kiến trúc Triển khai
 
-### Container Deployment Diagram | Sơ đồ Triển khai Container
+### Simple Deployment Diagram | Sơ đồ Triển khai Đơn giản
 
 ```mermaid
 graph TB
     subgraph "Production Environment"
-        subgraph "Load Balancer Tier"
-            LB1[Nginx Load Balancer 1<br/>Primary]
-            LB2[Nginx Load Balancer 2<br/>Backup]
-        end
-        
         subgraph "Application Tier"
-            subgraph "Frontend Cluster"
-                ST1[Streamlit Instance 1<br/>Port 8501]
-                ST2[Streamlit Instance 2<br/>Port 8501]
-                ST3[Streamlit Instance 3<br/>Port 8501]
+            subgraph "Frontend"
+                ST[Streamlit Application<br/>Port 8501]
             end
             
-            subgraph "Backend Cluster"
-                API1[FastAPI Instance 1<br/>Port 8000]
-                API2[FastAPI Instance 2<br/>Port 8000]
-                API3[FastAPI Instance 3<br/>Port 8000]
+            subgraph "Backend"
+                API[FastAPI Application<br/>Port 8000]
             end
-        end
-        
-        subgraph "Data Tier"
-            subgraph "Database Cluster"
-                PG_MASTER[PostgreSQL Master<br/>Read/Write]
-                PG_SLAVE1[PostgreSQL Slave 1<br/>Read Only]
-                PG_SLAVE2[PostgreSQL Slave 2<br/>Read Only]
-            end
-            
-            subgraph "Cache Cluster"
-                RD_MASTER[Redis Master<br/>Primary Cache]
-                RD_SLAVE1[Redis Slave 1<br/>Replica]
-                RD_SLAVE2[Redis Slave 2<br/>Replica]
-            end
-        end
-        
-        subgraph "Storage Tier"
-            FS1[File Storage 1<br/>Documents]
-            FS2[File Storage 2<br/>Backup]
         end
     end
     
@@ -503,98 +364,10 @@ graph TB
         MONITOR[Monitoring Service<br/>Application Insights]
     end
     
-    LB1 --> ST1
-    LB1 --> ST2
-    LB1 --> ST3
-    LB2 --> ST1
-    LB2 --> ST2
-    LB2 --> ST3
-    
-    ST1 --> API1
-    ST2 --> API2
-    ST3 --> API3
-    
-    API1 --> PG_MASTER
-    API2 --> PG_SLAVE1
-    API3 --> PG_SLAVE2
-    
-    API1 --> RD_MASTER
-    API2 --> RD_SLAVE1
-    API3 --> RD_SLAVE2
-    
-    API1 --> FS1
-    API2 --> FS1
-    API3 --> FS1
-    
-    API1 --> PINECONE
-    API2 --> PINECONE
-    API3 --> PINECONE
-    
-    API1 --> OPENAI
-    API2 --> OPENAI
-    API3 --> OPENAI
-    
-    PG_MASTER -.-> PG_SLAVE1
-    PG_MASTER -.-> PG_SLAVE2
-    RD_MASTER -.-> RD_SLAVE1
-    RD_MASTER -.-> RD_SLAVE2
-    FS1 -.-> FS2
-```
-
-### Docker Compose Architecture | Kiến trúc Docker Compose
-
-```mermaid
-graph TB
-    subgraph "Docker Compose Stack"
-        subgraph "Frontend Services"
-            FRONTEND[vietnamese-legal-frontend<br/>Streamlit Container<br/>Port: 8501]
-        end
-        
-        subgraph "Backend Services"
-            BACKEND[vietnamese-legal-backend<br/>FastAPI Container<br/>Port: 8000]
-        end
-        
-        subgraph "Database Services"
-            POSTGRES[vietnamese-legal-postgres<br/>PostgreSQL Container<br/>Port: 5432]
-            REDIS[vietnamese-legal-redis<br/>Redis Container<br/>Port: 6379]
-        end
-        
-        subgraph "Infrastructure Services"
-            NGINX[vietnamese-legal-nginx<br/>Nginx Container<br/>Port: 80,443]
-            PROMETHEUS[vietnamese-legal-prometheus<br/>Monitoring Container<br/>Port: 9090]
-            GRAFANA[vietnamese-legal-grafana<br/>Dashboard Container<br/>Port: 3000]
-        end
-        
-        subgraph "Data Volumes"
-            VOL_PG[postgres_data<br/>Database Storage]
-            VOL_RD[redis_data<br/>Cache Storage]
-            VOL_FILES[file_storage<br/>Document Storage]
-            VOL_LOGS[log_storage<br/>Application Logs]
-        end
-        
-        subgraph "Networks"
-            NET[vietnamese_legal_network<br/>Internal Communication]
-        end
-    end
-    
-    NGINX --> FRONTEND
-    NGINX --> BACKEND
-    FRONTEND --> BACKEND
-    BACKEND --> POSTGRES
-    BACKEND --> REDIS
-    POSTGRES --> VOL_PG
-    REDIS --> VOL_RD
-    BACKEND --> VOL_FILES
-    BACKEND --> VOL_LOGS
-    
-    PROMETHEUS --> BACKEND
-    GRAFANA --> PROMETHEUS
-    
-    FRONTEND -.-> NET
-    BACKEND -.-> NET
-    POSTGRES -.-> NET
-    REDIS -.-> NET
-    NGINX -.-> NET
+    ST --> API
+    API --> PINECONE
+    API --> OPENAI
+    API --> MONITOR
 ```
 
 ---
@@ -621,7 +394,6 @@ graph TB
         
         subgraph "Data Security"
             ENCRYPT[Data Encryption<br/>AES-256 at Rest]
-            BACKUP[Secure Backups<br/>Encrypted Storage]
             AUDIT[Audit Logging<br/>Security Events]
             GDPR[GDPR Compliance<br/>Vietnamese Data Laws]
         end
@@ -640,13 +412,11 @@ graph TB
         COMPLIANCE[Compliance Monitoring<br/>Legal Requirements]
     end
     
-    WAF --> SSL
     SSL --> AUTH
     AUTH --> AUTHZ
     AUTHZ --> VALID
     
-    ENCRYPT --> BACKUP
-    BACKUP --> AUDIT
+    ENCRYPT --> AUDIT
     AUDIT --> GDPR
     
     SECRETS --> MONITOR
@@ -714,46 +484,38 @@ graph TB
         subgraph "Integration Layer"
             OPENAI_INT[OpenAI Integration<br/>API Client + Retry Logic]
             PINECONE_INT[Pinecone Integration<br/>Vector Operations]
-            EMAIL_INT[Email Integration<br/>SMTP + Templates]
             MONITORING_INT[Monitoring Integration<br/>Metrics + Alerts]
         end
         
         subgraph "Adapter Pattern"
             AI_ADAPTER[AI Service Adapter<br/>Abstract Interface]
             VECTOR_ADAPTER[Vector DB Adapter<br/>Abstract Interface]
-            NOTIFICATION_ADAPTER[Notification Adapter<br/>Abstract Interface]
         end
     end
     
     subgraph "External Services"
         OPENAI[OpenAI API<br/>GPT-4 + Embeddings]
         PINECONE[Pinecone Cloud<br/>Vector Database]
-        SMTP[Email Service<br/>SendGrid/SMTP]
         APPINSIGHTS[Application Insights<br/>Azure Monitor]
     end
     
     subgraph "Fallback Services"
         OLLAMA[Ollama<br/>Local LLM Fallback]
         CHROMA[ChromaDB<br/>Local Vector DB]
-        LOCAL_EMAIL[Local Email<br/>SMTP Server]
     end
     
     CORE --> AI_ADAPTER
     CORE --> VECTOR_ADAPTER
-    CORE --> NOTIFICATION_ADAPTER
     
     AI_ADAPTER --> OPENAI_INT
     VECTOR_ADAPTER --> PINECONE_INT
-    NOTIFICATION_ADAPTER --> EMAIL_INT
     
     OPENAI_INT --> OPENAI
     PINECONE_INT --> PINECONE
-    EMAIL_INT --> SMTP
     MONITORING_INT --> APPINSIGHTS
     
     OPENAI_INT -.->|Fallback| OLLAMA
     PINECONE_INT -.->|Fallback| CHROMA
-    EMAIL_INT -.->|Fallback| LOCAL_EMAIL
 ```
 
 ### API Integration Patterns | Mẫu Tích hợp API
@@ -787,7 +549,6 @@ graph TB
         subgraph "Circuit Breaker Pattern"
             CB_OPENAI[OpenAI Circuit Breaker<br/>Fault Tolerance]
             CB_PINECONE[Pinecone Circuit Breaker<br/>Fault Tolerance]
-            CB_EMAIL[Email Circuit Breaker<br/>Fault Tolerance]
         end
     end
     
@@ -802,7 +563,6 @@ graph TB
     
     REST_CLIENT --> CB_OPENAI
     REST_CLIENT --> CB_PINECONE
-    REST_CLIENT --> CB_EMAIL
     
     QUEUE --> WORKER
     WORKER --> WEBHOOK
@@ -835,15 +595,13 @@ graph TB
         
         subgraph "Worker Scaling"
             WORKER_ASG[Worker Auto Scaling Group<br/>Min: 2, Max: 15]
-            W1[Document Processor 1]
-            W2[Document Processor 2]
-            WN[Document Processor N]
+            W1[Text Processor 1]
+            W2[Text Processor 2]
+            WN[Text Processor N]
         end
     end
     
-    subgraph "Database Scaling"
-        PG_CLUSTER[PostgreSQL Cluster<br/>Read Replicas]
-        RD_CLUSTER[Redis Cluster<br/>Sharded Cache]
+    subgraph "External Scaling"
         PC_SHARDS[Pinecone Shards<br/>Multi-Region]
     end
     
@@ -873,14 +631,6 @@ graph TB
     REQ_METRIC --> API_ASG
     QUEUE_METRIC --> WORKER_ASG
     
-    API1 --> PG_CLUSTER
-    API2 --> PG_CLUSTER
-    APIN --> PG_CLUSTER
-    
-    API1 --> RD_CLUSTER
-    API2 --> RD_CLUSTER
-    APIN --> RD_CLUSTER
-    
     API1 --> PC_SHARDS
     API2 --> PC_SHARDS
     APIN --> PC_SHARDS
@@ -893,7 +643,6 @@ graph TB
     subgraph "Caching Strategy"
         subgraph "Multi-Level Cache"
             L1[L1 Cache<br/>Application Memory<br/>5 minutes TTL]
-            L2[L2 Cache<br/>Redis Cache<br/>1 hour TTL]
             L3[L3 Cache<br/>CDN Cache<br/>24 hours TTL]
         end
         
@@ -906,16 +655,14 @@ graph TB
     end
     
     subgraph "Database Optimization"
-        subgraph "Read Optimization"
-            READ_REPLICA[Read Replicas<br/>Load Distribution]
+        subgraph "Performance Optimization"
             QUERY_OPT[Query Optimization<br/>Index Strategy]
             CONN_POOL[Connection Pooling<br/>Resource Management]
         end
         
-        subgraph "Write Optimization"
-            BATCH_WRITE[Batch Writes<br/>Bulk Operations]
-            ASYNC_WRITE[Async Writes<br/>Non-blocking]
-            PARTITION[Table Partitioning<br/>Date-based]
+        subgraph "Processing Optimization"
+            ASYNC_PROC[Async Processing<br/>Non-blocking]
+            BATCH_PROC[Batch Processing<br/>Bulk Operations]
         end
     end
     
@@ -925,19 +672,16 @@ graph TB
         DOMAIN_INDEX[Legal Domain Index<br/>Fast Classification]
     end
     
-    L1 --> L2
-    L2 --> L3
+    L1 --> L3
     
     QUERY_CACHE --> L1
-    EMBEDDING_CACHE --> L2
-    SESSION_CACHE --> L2
+    EMBEDDING_CACHE --> L1
+    SESSION_CACHE --> L1
     STATIC_CACHE --> L3
     
-    READ_REPLICA --> QUERY_OPT
     QUERY_OPT --> CONN_POOL
     
-    BATCH_WRITE --> ASYNC_WRITE
-    ASYNC_WRITE --> PARTITION
+    ASYNC_PROC --> BATCH_PROC
     
     TEXT_CACHE --> EMBEDDING_CACHE
     EMBEDDING_PRECOMPUTE --> DOMAIN_INDEX
@@ -979,8 +723,6 @@ graph TB
     subgraph "Infrastructure Monitoring"
         NODE_EXPORTER[Node Exporter<br/>System Metrics]
         DOCKER_METRICS[Docker Metrics<br/>Container Stats]
-        POSTGRES_EXPORTER[PostgreSQL Exporter<br/>Database Metrics]
-        REDIS_EXPORTER[Redis Exporter<br/>Cache Metrics]
     end
     
     subgraph "External Service Monitoring"
@@ -1002,8 +744,6 @@ graph TB
     
     NODE_EXPORTER --> PROMETHEUS
     DOCKER_METRICS --> PROMETHEUS
-    POSTGRES_EXPORTER --> PROMETHEUS
-    REDIS_EXPORTER --> PROMETHEUS
     
     PROMETHEUS --> GRAFANA
     PROMETHEUS --> ALERT_MGR
@@ -1043,28 +783,28 @@ graph TB
 - ❌ Potential performance limitations
 - ❌ Limited frontend flexibility
 
-### ADR-002: Microservices with Containers
+### ADR-002: Simplified Architecture
 
 **Status:** Accepted  
 **Date:** August 2025  
 
-**Context:** Need to decide on deployment architecture
+**Context:** Need to simplify architecture for faster development
 
-**Decision:** Use containerized microservices with Docker
+**Decision:** Use simplified architecture without containers, databases, and complex infrastructure
 
 **Rationale:**
-- Scalability requirements
-- Development team separation
-- Technology isolation
-- Cloud-native deployment
-- Easy CI/CD integration
+- Faster development cycle
+- Reduced complexity
+- Focus on core AI functionality
+- Minimal infrastructure overhead
+- External services for data storage
 
 **Consequences:**
-- ✅ Independent service scaling
-- ✅ Technology flexibility
-- ✅ Better fault isolation
-- ❌ Increased complexity
-- ❌ Network latency concerns
+- ✅ Simplified deployment
+- ✅ Faster development
+- ✅ Reduced maintenance overhead
+- ❌ Limited scalability options
+- ❌ Dependency on external services
 
 ### ADR-003: External AI Services
 
@@ -1086,6 +826,7 @@ graph TB
 - ✅ High-quality AI responses
 - ✅ Reduced development time
 - ✅ Automatic model updates
+- ✅ Simplified data management
 - ❌ External service dependency
 - ❌ Data privacy considerations
 - ❌ Variable API costs
